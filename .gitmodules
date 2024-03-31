@@ -1,0 +1,3 @@
+[submodule "external/Musashi"]
+	path = external/Musashi
+	url = https://github.com/evansm7/Musashi.git
