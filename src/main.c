@@ -341,7 +341,7 @@ static unsigned int  FAST_FUNC(cpu_read_instr_normal)(unsigned int address)
 {
         /* Can check for 0x400000 (ROM) and otherwise RAM */
         if ((address & 0xf00000) != ROM_ADDR)
-                return RAM_RD_ALIGNED_BE16(address & (RAM_SIZE - 1));
+                return RAM_RD_ALIGNED_BE16(CLAMP_RAM_ADDR(address));
         else
                 return ROM_RD_ALIGNED_BE16(address & (ROM_SIZE - 1));
 }
@@ -353,7 +353,7 @@ static unsigned int  FAST_FUNC(cpu_read_instr_overlay)(unsigned int address)
         if (IS_ROM(address))
                 return ROM_RD_ALIGNED_BE16(address & (ROM_SIZE - 1));
         else /* RAM */
-                return RAM_RD_ALIGNED_BE16(address & (RAM_SIZE - 1));
+                return RAM_RD_ALIGNED_BE16(CLAMP_RAM_ADDR(address));
 }
 
 unsigned int (*cpu_read_instr)(unsigned int address) = cpu_read_instr_overlay;
@@ -363,7 +363,7 @@ unsigned int    FAST_FUNC(cpu_read_byte)(unsigned int address)
 {
         /* Most likely a RAM access, followed by a ROM access, then I/O */
         if (IS_RAM(address))
-                return RAM_RD8(address & (RAM_SIZE - 1));
+                return RAM_RD8(CLAMP_RAM_ADDR(address));
         if (IS_ROM(address))
                 return ROM_RD8(address & (ROM_SIZE - 1));
 
@@ -384,7 +384,7 @@ unsigned int    FAST_FUNC(cpu_read_byte)(unsigned int address)
 unsigned int    FAST_FUNC(cpu_read_word)(unsigned int address)
 {
         if (IS_RAM(address))
-                return RAM_RD16(address & (RAM_SIZE - 1));
+                return RAM_RD16(CLAMP_RAM_ADDR(address));
         if (IS_ROM(address))
                 return ROM_RD16(address & (ROM_SIZE - 1));
 
@@ -398,7 +398,7 @@ unsigned int    FAST_FUNC(cpu_read_word)(unsigned int address)
 unsigned int    FAST_FUNC(cpu_read_long)(unsigned int address)
 {
         if (IS_RAM(address))
-                return RAM_RD32(address & (RAM_SIZE - 1));
+                return RAM_RD32(CLAMP_RAM_ADDR(address));
         if (IS_ROM(address))
                 return ROM_RD32(address & (ROM_SIZE - 1));
 
@@ -413,7 +413,7 @@ unsigned int    FAST_FUNC(cpu_read_long)(unsigned int address)
 unsigned int    cpu_read_word_dasm(unsigned int address)
 {
         if (IS_RAM(address))
-                return RAM_RD16(address & (RAM_SIZE - 1));
+                return RAM_RD16(CLAMP_RAM_ADDR(address));
         if (IS_ROM(address))
                 return ROM_RD16(address & (ROM_SIZE - 1));
 
@@ -424,7 +424,7 @@ unsigned int    cpu_read_word_dasm(unsigned int address)
 unsigned int    cpu_read_long_dasm(unsigned int address)
 {
         if (IS_RAM(address))
-                return RAM_RD32(address & (RAM_SIZE - 1));
+                return RAM_RD32(CLAMP_RAM_ADDR(address));
         if (IS_ROM(address))
                 return ROM_RD32(address & (ROM_SIZE - 1));
 
@@ -437,7 +437,7 @@ unsigned int    cpu_read_long_dasm(unsigned int address)
 void    FAST_FUNC(cpu_write_byte)(unsigned int address, unsigned int value)
 {
         if (IS_RAM(address)) {
-                RAM_WR8(address & (RAM_SIZE - 1), value);
+                RAM_WR8(CLAMP_RAM_ADDR(address), value);
                 return;
         }
 
@@ -468,7 +468,7 @@ void    FAST_FUNC(cpu_write_byte)(unsigned int address, unsigned int value)
 void    FAST_FUNC(cpu_write_word)(unsigned int address, unsigned int value)
 {
         if (IS_RAM(address)) {
-                RAM_WR16(address & (RAM_SIZE - 1), value);
+                RAM_WR16(CLAMP_RAM_ADDR(address), value);
                 return;
         }
         printf("Ignoring write %04x to address %08x\n", value&0xffff, address);
@@ -477,7 +477,7 @@ void    FAST_FUNC(cpu_write_word)(unsigned int address, unsigned int value)
 void    FAST_FUNC(cpu_write_long)(unsigned int address, unsigned int value)
 {
         if (IS_RAM(address)) {
-                RAM_WR32(address & (RAM_SIZE - 1), value);
+                RAM_WR32(CLAMP_RAM_ADDR(address), value);
                 return;
         }
         printf("Ignoring write %08x to address %08x\n", value, address);

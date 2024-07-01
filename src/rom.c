@@ -97,6 +97,23 @@ static void     rom_patch_plusv3(uint8_t *rom_base)
          * - No IWM init
          * - new Sound?
          */
+#if UMAC_MEMSIZE > 128 && UMAC_MEMSIZE < 512
+        /* Hack to change memtop: try out a 256K Mac :) */
+        for (int i = 0x376; i < 0x37e; i += 2)
+                ROM_WR16(i, M68K_INST_NOP);
+        ROM_WR16(0x376, 0x2a7c); // moveal #RAM_SIZE, A5
+        ROM_WR16(0x378, RAM_SIZE >> 16);
+        ROM_WR16(0x37a, RAM_SIZE & 0xffff);
+        /* That overrides the probed memory size, but
+         * P_ChecksumRomAndTestMemory returns a failure code for
+         * things that aren't 128/512.  Skip that:
+         */
+        ROM_WR16(0x132, 0x6000); // Bra (was BEQ)
+        /* FIXME: We should also remove the memory probe routine, by
+         * allowing the ROM checksum to fail (it returns failure, then
+         * we carry on).  This avoids wild RAM addrs being accessed.
+         */
+#endif
 }
 
 int      rom_patch(uint8_t *rom_base)
