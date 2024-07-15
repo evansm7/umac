@@ -51,6 +51,11 @@ ifeq ($(DEBUG),1)
 	CFLAGS += -Og -g -ggdb -DDEBUG
 endif
 
+# Basic support for changing screen res (with the MacPlusV3 ROM)
+DISP_WIDTH ?= 512
+DISP_HEIGHT ?= 342
+CFLAGS_CFG = -DDISP_WIDTH=$(DISP_WIDTH) -DDISP_HEIGHT=$(DISP_HEIGHT)
+
 all:	main
 
 $(MUSASHI_SRC): $(MUSASHI)/m68kops.h
@@ -61,7 +66,7 @@ $(MUSASHI)/m68kops.c $(MUSASHI)/m68kops.h:
 prepare:	$(MUSASHI)/m68kops.c $(MUSASHI)/m68kops.h
 
 %.o:	%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_CFG) -c $< -o $@
 
 main:	$(OBJS)
 	@echo Linking $(OBJS)

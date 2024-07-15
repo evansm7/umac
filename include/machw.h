@@ -36,9 +36,6 @@
 
 #define PV_SONY_ADDR    0xc00069        /* Magic address for replacement driver PV ops */
 
-#define DISP_WIDTH      512
-#define DISP_HEIGHT     342
-
 ////////////////////////////////////////////////////////////////////////////////
 // RAM accessors
 //
