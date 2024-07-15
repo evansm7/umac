@@ -50,6 +50,7 @@ static void     print_help(char *n)
                "\t-r <rom path>\t\tDefault 'rom.bin'\n"
                "\t-W <rom dump path>\tDump ROM after patching\n"
                "\t-d <disc path>\n"
+               "\t-w\t\t\tEnable persistent disc writes (default R/O)\n"
                "\t-i\t\t\tDisassembled instruction trace\n", n);
 }
 
@@ -98,11 +99,12 @@ int     main(int argc, char *argv[])
         int ofd;
         int ch;
         int opt_disassemble = 0;
+        int opt_write = 0;
 
         ////////////////////////////////////////////////////////////////////////
         // Args
 
-        while ((ch = getopt(argc, argv, "r:d:W:ih")) != -1) {
+        while ((ch = getopt(argc, argv, "r:d:W:ihw")) != -1) {
                 switch (ch) {
                 case 'r':
                         rom_filename = strdup(optarg);
@@ -114,6 +116,10 @@ int     main(int argc, char *argv[])
 
                 case 'd':
                         disc_filename = strdup(optarg);
+                        break;
+
+                case 'w':
+                        opt_write = 1;
                         break;
 
                 case 'W':
@@ -190,8 +196,8 @@ int     main(int argc, char *argv[])
 
         if (disc_filename) {
                 printf("Opening disc '%s'\n", disc_filename);
-                // FIXME: R/W, >1 disc
-                ofd = open(disc_filename, O_RDONLY);
+                // FIXME: >1 disc
+                ofd = open(disc_filename, opt_write ? O_RDWR : O_RDONLY);
                 if (ofd < 0) {
                         perror("Disc");
                         return 1;
@@ -199,7 +205,16 @@ int     main(int argc, char *argv[])
 
                 fstat(ofd, &sb);
                 size_t disc_size = sb.st_size;
-                disc_base = mmap(0, disc_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, ofd, 0);
+
+                /* Discs are always _writable_ from the perspective of
+                 * the Mac, but by default data is a MAP_PRIVATE copy
+                 * and is not synchronised to the backing file.  If
+                 * opt_write, we use MAP_SHARED and open the file RW,
+                 * so writes persist to the disc image.
+                 */
+                disc_base = mmap(0, disc_size, PROT_READ | PROT_WRITE,
+                                 opt_write ? MAP_SHARED : MAP_PRIVATE,
+                                 ofd, 0);
                 if (disc_base == MAP_FAILED) {
                         printf("Can't mmap disc!\n");
                         return 1;
@@ -207,7 +222,7 @@ int     main(int argc, char *argv[])
                 printf("Disc mapped at %p, size %ld\n", (void *)disc_base, disc_size);
 
                 discs[0].base = disc_base;
-                discs[0].read_only = 1;
+                discs[0].read_only = 0;         /* See above */
                 discs[0].size = disc_size;
         }
 

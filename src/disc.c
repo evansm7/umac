@@ -87,7 +87,7 @@ int     disc_pv_hook(uint8_t opcode)
 #define ReadMacInt16(addr)              RAM_RD16(addr)
 #define ReadMacInt8(addr)               RAM_RD8(addr)
 
-#define Mac2HostAddr(addr)              (ram_get_base() + (addr))
+#define Mac2HostAddr(addr)              (ram_get_base() + ADR24(addr))
 
 // These access host pointers, in BE/unaligned:
 #define WriteBEInt32(addr, val)         WRITE_LONG(((uint8_t *)(addr)), 0, val)
@@ -303,13 +303,15 @@ int16_t SonyPrime(uint32_t pb, uint32_t dce)
 		WriteMacInt32(0x300, 0);
 		WriteMacInt32(0x304, 0);
 	} else {
-                DDBG("DISC: WRITE %ld to +0x%x (not performed)\n", length, position);
+                DDBG("DISC: WRITE %ld to +0x%x\n", length, position);
 
 		// Write
 		if (info->read_only)
 			return set_dsk_err(wPrErr);
-                // FIXME: Add write code here, if required.
-                return set_dsk_err(wPrErr);
+
+                DDBG("DISC: WRITE %ld to +0x%x\n", length, position);
+                DDBG(" (Write buffer: %p)\n", (void *)&info->data[position]);
+                memcpy(&info->data[position], buffer, length);
 	}
 
 	// Update ParamBlock and DCE
