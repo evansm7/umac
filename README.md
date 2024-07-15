@@ -46,8 +46,6 @@ There's no emulation for:
   * Framebuffer switching: the Mac supports double-buffering by moving
     the base of screen memory via the VIA (ha), but I haven't seen
     anything using it.  Easy to add.
-  * Disc writes (easy to enable, untested).  I didn't need to save my
-    MacWrite essays so far.
 
 The emulator is structured so as to be easily embeddable in other
 projects.  You initialise it, and pass in UI events (such as
