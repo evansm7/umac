@@ -105,7 +105,7 @@ static void     scc_wr0(uint8_t data)
                 // 2: reset Ext/Status IRQs
                 // enables RR0 status to be re-latched (cause IRQ again if sometihng's pending?)
         default:
-                SDBG("[  SCC WR0: Command %d unhandled]\n", cmd);
+                SDBG("(SCC WR0: Command %d unhandled!)\n", cmd);
         }
 }
 
@@ -113,6 +113,16 @@ static void     scc_wr0(uint8_t data)
 static void     scc_wr2(uint8_t data)
 {
         scc_vec = data;
+}
+
+// WR3: Receive Parameters & Control
+static void     scc_wr3(int AnB, uint8_t data)
+{
+        // Keep an eye out for bit 0x10 (enter hunt mode), and external/status is asserted
+
+        if (data & 0x10) {
+                // Enter hunt mode (Don't really need to do anything, 7.5.5 doesn't care)
+        }
 }
 
 // WR9: Master Interrupt control and reset commands
@@ -145,6 +155,19 @@ static uint8_t  scc_rr0(int AnB)
         } else {
                 v = (scc_dcd_pins & 2) ? 0x08 : 0;
         }
+        // (Other bits: [2] = TX empty, [5] = /CTS)
+        v |= 0x10; // Sync/Hunt status (set on reset/by hunt?)
+        v |= 0x40; // TxUnderrun/EOM
+
+        return v;
+}
+
+// RR1: Special Receive condition
+static uint8_t  scc_rr1(int AnB)
+{
+        uint8_t v = 0x01 /* All sent */ | 0x06 /* SDLC, set to 011 on channel reset */;
+        (void)AnB;
+        // Note, not really necessary (7.5.5 is OK to return 0) but A Bit Better
         return v;
 }
 
@@ -233,8 +256,10 @@ void    scc_write(unsigned int address, uint8_t data)
         unsigned int AnB = !!(r & 1);
         unsigned int DnC = !!(r & 2);
 
+        SDBG("[SCC: Write %x %02x]: ", address, data);
+
         if (DnC) {
-                SDBG("[ SCC: Data write (%c) ignored]\n", 'B' - AnB);
+                SDBG("[SCC: Data write (%c) ignored]\n", 'B' - AnB);
         } else {
                 SDBG("[SCC: WR %02x -> WR%d%c]\n",
                      data, scc_reg_ptr, 'B' - AnB);
@@ -245,6 +270,10 @@ void    scc_write(unsigned int address, uint8_t data)
                         break;
                 case 2:
                         scc_wr2(data);
+                        scc_reg_ptr = 0;
+                        break;
+                case 3:
+                        scc_wr3(AnB, data);
                         scc_reg_ptr = 0;
                         break;
                 case 9:
@@ -271,8 +300,9 @@ uint8_t scc_read(unsigned int address)
         unsigned int AnB = !!(r & 1);
         unsigned int DnC = !!(r & 2);
 
+        SDBG("[SCC: Read %x]: ", address);
         if (DnC) {
-                SDBG("[ SCC: Data read (%c) ignored]\n", 'B' - AnB);
+                SDBG("[SCC: Data read (%c) ignored]\n", 'B' - AnB);
         } else {
                 SDBG("[SCC: RD <- RR%d%c = ",
                      scc_reg_ptr, 'B' - AnB);
@@ -280,6 +310,9 @@ uint8_t scc_read(unsigned int address)
                 switch (scc_reg_ptr) {
                 case 0:
                         data = scc_rr0(AnB);
+                        break;
+                case 1:
+                        data = scc_rr1(AnB);
                         break;
                 case 2:
                         data = scc_rr2(AnB);
