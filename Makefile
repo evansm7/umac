@@ -26,6 +26,7 @@
 #
 
 DEBUG ?= 0
+MEMSIZE ?= 128
 
 SOURCES = $(wildcard src/*.c)
 
@@ -43,6 +44,7 @@ LIBS = $(SDL_LIBS) -lm
 
 INCLUDEFLAGS = -Iinclude/ -I$(MUSASHI) $(SDL_CFLAGS) -DMUSASHI_CNF=\"../include/m68kconf.h\"
 INCLUDEFLAGS += -DENABLE_DASM=1
+INCLUDEFLAGS += -DUMAC_MEMSIZE=$(MEMSIZE)
 CFLAGS = $(INCLUDEFLAGS) -Wall -Wextra -pedantic -DSIM
 
 ifeq ($(DEBUG),1)

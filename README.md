@@ -33,12 +33,14 @@ This emulates the following hardware:
   * VIA shift register for keyboard
   * SCC DCD pin change interrupts, for mouse
   * Paravirtualised disc storage
-  * Defaults to 128K of RAM, but will run as a Mac 512K by changing
-    a `#define` (`RAM_SIZE`).
+  * Defaults to 128K of RAM, but will run as a Mac 512K by building
+    with `MEMSIZE=512`.  Or, you could use 1024, 2048, or 4096 to
+    make a 1/2/4MB Mac Plus.
 
 There's no emulation for:
 
   * IWM/realistic floppy drives
+  * SCSI; the machine is sort of like a Mac Plus without SCSI.
   * More than one disc, or runtime image-switching
   * Sound (a lot of work for a beep)
   * VIA timers (Space Invaders runs too fast, probably because of this)
@@ -110,7 +112,8 @@ make
 ```
 
 No surprises here.  No autoconf either.  :D You can add a `DEBUG=1` to
-make to compile in debug spew.
+make to compile in debug spew, and add `MEMSIZE=<size_in_KB>` to control
+the amount of memory.
 
 This will configure and build _Musashi_, umac, and `unix_main.c` as
 the SDL2 frontend.  The _Musashi_ build generates a few files
@@ -185,7 +188,7 @@ pitfalls/observations:
     (e.g. `Open()`, `Prime()`, `Control()`, `Status()`) the call is
     routed to host-side C code in `disc.c`.  The emulation code
     doesn't support any of the advanced things a driver can be asked
-    to do, such as formatting – just read/[not yet write] of a block.
+    to do, such as formatting – just read/write of a block.
     When the disc is asked to be ejected, a `umac` callback is called;
     currently this just exits the emulator.  The beginnings of
     multi-disc support are there, but not enabled – again, bare

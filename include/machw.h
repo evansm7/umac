@@ -31,7 +31,7 @@
 #include "rom.h"
 
 #define ROM_ADDR        0x400000        /* Regular base (and 0, when overlay=0 */
-#define RAM_SIZE        (0x20000*1)
+#define RAM_SIZE        (1024*UMAC_MEMSIZE)
 #define RAM_HIGH_ADDR   0x600000
 
 #define PV_SONY_ADDR    0xc00069        /* Magic address for replacement driver PV ops */
