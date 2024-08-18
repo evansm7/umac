@@ -1,6 +1,6 @@
 # Micro Mac (umac)
 
-v0.1 15 June 2024
+v0.2 18 August 2024
 
 This is a minimalist Apple Macintosh 128K/512K emulator.  It uses the
 _Musashi_ 68K interpreter and lashes the absolute minimum in hardware
