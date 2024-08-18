@@ -189,6 +189,10 @@ pitfalls/observations:
     routed to host-side C code in `disc.c`.  The emulation code
     doesn't support any of the advanced things a driver can be asked
     to do, such as formatting – just read/write of a block.
+    The read/write can be performed internally, by passing a pointer
+    to an in-memory mapping of the disc data (e.g. `unix_main.c` just
+    `mmap()`s the disc); or, `op_read`/`op_write` callbacks can be
+    used for when a host disc op needs to be performed.
     When the disc is asked to be ejected, a `umac` callback is called;
     currently this just exits the emulator.  The beginnings of
     multi-disc support are there, but not enabled – again, bare

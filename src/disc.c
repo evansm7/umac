@@ -130,11 +130,14 @@ int     disc_pv_hook(uint8_t opcode)
 // Struct for each drive
 typedef struct sony_drive_info {
 	int num;			// Drive number
-	uint8_t *data;
+	uint8_t *data;          // If non-zero, direct mapping of block data
         unsigned int size;
 	int to_be_mounted;	// Flag: drive must be mounted in accRun
 	int read_only;		// Flag: force write protection
 	uint32_t status;	// Mac address of drive status record
+	void *op_ctx;
+	disc_op_read op_read;   // Callback for read (when data == 0)
+	disc_op_write op_write; //  ''    ''    write  ''
 } sony_drinfo_t;
 
 // List of drives handled by this driver
@@ -164,6 +167,9 @@ void SonyInit(disc_descr_t discs[DISC_NUM_DRIVES])
         drives[0].read_only = discs[0].read_only;
         drives[0].data = discs[0].base;
         drives[0].size = discs[0].size;
+        drives[0].op_ctx = discs[0].op_ctx;
+        drives[0].op_read = discs[0].op_read;
+        drives[0].op_write = discs[0].op_write;
         // FIXME: Disc 2
 }
 
@@ -295,8 +301,20 @@ int16_t SonyPrime(uint32_t pb, uint32_t dce)
 	size_t actual = 0;
 	if ((ReadMacInt16(pb + ioTrap) & 0xff) == aRdCmd) {
                 DDBG("DISC: READ %ld from +0x%x\n", length, position);
-                DDBG(" (Read buffer: %p)\n", (void *)&info->data[position]);
-                memcpy(buffer, &info->data[position], length);
+                if (info->data) {
+                        DDBG(" (Read buffer: %p)\n", (void *)&info->data[position]);
+                        memcpy(buffer, &info->data[position], length);
+                } else {
+                        if (info->op_read) {
+                                DDBG(" (read op into buffer)\n");
+                                int r = info->op_read(info->op_ctx, buffer, position, length);
+                                if (r < 0)
+                                        return set_dsk_err(paramErr);
+                        } else {
+                                DERR("No disc read strategy!\n");
+                                return set_dsk_err(offLinErr);
+                        }
+                }
 
 		// Clear TagBuf
 		WriteMacInt32(0x2fc, 0);
@@ -310,9 +328,21 @@ int16_t SonyPrime(uint32_t pb, uint32_t dce)
 			return set_dsk_err(wPrErr);
 
                 DDBG("DISC: WRITE %ld to +0x%x\n", length, position);
-                DDBG(" (Write buffer: %p)\n", (void *)&info->data[position]);
-                memcpy(&info->data[position], buffer, length);
-	}
+                if (info->data) {
+                        DDBG(" (Write buffer: %p)\n", (void *)&info->data[position]);
+                        memcpy(&info->data[position], buffer, length);
+                } else {
+                        if (info->op_write) {
+                                DDBG(" (write op into buffer)\n");
+                                int r = info->op_write(info->op_ctx, buffer, position, length);
+                                if (r < 0)
+                                        return set_dsk_err(paramErr);
+                        } else {
+                                DERR("No disc write strategy!\n");
+                                return set_dsk_err(offLinErr);
+                        }
+                }
+        }
 
 	// Update ParamBlock and DCE
 	WriteMacInt32(pb + ioActCount, actual);
