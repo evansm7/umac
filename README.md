@@ -1,12 +1,13 @@
 # Micro Mac (umac)
 
-v0.2 18 August 2024
+v0.21 26 August 2024
 
 This is a minimalist Apple Macintosh 128K/512K emulator.  It uses the
 _Musashi_ 68K interpreter and lashes the absolute minimum in hardware
 emulation around it so as to boot and run basic apps.  It's been
-tested with System 2.0 up to System 3.2, and runs MacWrite, MacDraw, and
-Missile Command.
+tested with System 2.0 up to System 7.5.5, and runs MacWrite, MacDraw, and
+Missile Command.  (For a Mac 128K, System 3.2 is the last OS that will
+run, but by configuring 2MB+, even System 7 will work.)
 
 You can write, draw, and unwind with an apocalyptic game.  Live well.
 
@@ -34,8 +35,10 @@ This emulates the following hardware:
   * SCC DCD pin change interrupts, for mouse
   * Paravirtualised disc storage
   * Defaults to 128K of RAM, but will run as a Mac 512K by building
-    with `MEMSIZE=512`.  Or, you could use 1024, 2048, or 4096 to
-    make a 1/2/4MB Mac Plus.
+    with `MEMSIZE=512`.  Or, you could use 1024, 2048, or 4096 to make
+    a 1/2/4MB Mac Plus-like machine.  Straying off-piste a little, you
+    can also use unsupported values like 256, 208, 192KB; when this is
+    done, the ROM is patched to "probe" the correct memory size.
 
 There's no emulation for:
 
@@ -94,7 +97,7 @@ ROM is _Mac Plus V3 ROM_, checksum `4d1f8172`.
 
 (Note this makes this a _Mac 128Ke_, fancy!)
 
-Then, get a boot disk.  Any System up to 3.2 should work fine (though
+Then, get a boot disk.  Any System up to 3.2 should work fine on a 128K (though
 I don't think I've tried 1.0).  I just tested a random German System 3.2 disc
 from WinWorld and it works fine.  You might want to use Mini vMac or
 Basilisk (i.e. a proper emulator) to prepare a disc image with some
