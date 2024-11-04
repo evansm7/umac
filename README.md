@@ -116,7 +116,7 @@ To build in MSYS2 on Windows, use
 ```
 make -f Makefile.msys2
 ```
-(the only difference to the normal Makefile is the addition of ä`-lmman` to the libraries list).
+(the only difference to the normal Makefile is the addition of `-lmman` to the libraries list).
 
 On Linux or macOS, use
 ```
