@@ -50,7 +50,7 @@ static inline void      umac_1hz_event(void)
 static inline unsigned int      umac_get_fb_offset(void)
 {
         /* FIXME: Implement VIA RA6/vid.pg2 */
-        return RAM_SIZE - 0x5900;
+        return RAM_SIZE - ((DISP_WIDTH * DISP_HEIGHT / 8) + 0x380);
 }
 
 #endif
