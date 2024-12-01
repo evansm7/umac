@@ -66,8 +66,8 @@ static void     copy_fb(uint32_t *fb_out, uint8_t *fb_in)
         // Output L-R, big-endian shorts, with bits in MSB-LSB order:
         for (int y = 0; y < DISP_HEIGHT; y++) {
                 for (int x = 0; x < DISP_WIDTH; x += 16) {
-                        uint8_t plo = fb_in[x/8 + (y * 512/8) + 0];
-                        uint8_t phi = fb_in[x/8 + (y * 512/8) + 1];
+                        uint8_t plo = fb_in[x/8 + (y * DISP_WIDTH/8) + 0];
+                        uint8_t phi = fb_in[x/8 + (y * DISP_WIDTH/8) + 1];
                         for (int i = 0; i < 8; i++) {
                                 *fb_out++ = (plo & (0x80 >> i)) ? 0 : 0xffffffff;
                         }
