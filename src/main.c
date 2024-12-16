@@ -79,7 +79,7 @@ static int disassemble = 0;
 
 #define UMAC_EXECLOOP_QUANTUM   5000
 
-static void    update_overlay_layout();
+static void    update_overlay_layout(void);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -169,7 +169,7 @@ static void     via_rb_changed(uint8_t val)
         (void)val;
 }
 
-static uint8_t  via_ra_in()
+static uint8_t  via_ra_in(void)
 {
         return 0;
 }
@@ -178,7 +178,7 @@ static uint8_t  via_ra_in()
 static uint8_t via_quadbits = 0;
 static uint8_t via_mouse_pressed = 0;
 
-static uint8_t  via_rb_in()
+static uint8_t  via_rb_in(void)
 {
         uint8_t v = via_quadbits;
         // Mouse not pressed!
@@ -250,7 +250,7 @@ static void     kbd_rx(uint8_t data)
         }
 }
 
-static void     kbd_check_work()
+static void     kbd_check_work(void)
 {
         /* Process a keyboard command a little later than the transmit
          * time (i.e. not immediately, which makes the mac feel rushed
@@ -484,7 +484,7 @@ void    FAST_FUNC(cpu_write_long)(unsigned int address, unsigned int value)
 }
 
 /* Update function pointers for memory accessors based on overlay state/memory map layout */
-static void     update_overlay_layout()
+static void     update_overlay_layout(void)
 {
         if (overlay) {
                 cpu_read_instr = cpu_read_instr_overlay;
@@ -624,7 +624,7 @@ void    umac_mouse(int deltax, int deltay, int button)
         via_mouse_pressed = button;
 }
 
-static void     mouse_tick()
+static void     mouse_tick(void)
 {
         /* Periodically, check if the mouse X/Y deltas are non-zero.
          * If a movement is required, encode one step in X and/or Y
@@ -682,14 +682,14 @@ static void     mouse_tick()
         scc_set_dcd(dcd_a, dcd_b);
 }
 
-void    umac_reset()
+void    umac_reset(void)
 {
         overlay = 1;
         m68k_pulse_reset();
 }
 
 /* Called by the disc code when an eject op happens. */
-void    umac_disc_ejected()
+void    umac_disc_ejected(void)
 {
 #ifdef SIM
         exit(1);
@@ -701,7 +701,7 @@ void    umac_disc_ejected()
 /* Run the emulator for about a frame.
  * Returns 0 for not-done, 1 when an exit/done condition arises.
  */
-int     umac_loop()
+int     umac_loop(void)
 {
         setjmp(main_loop_jb);
 

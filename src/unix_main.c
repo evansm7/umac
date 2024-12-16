@@ -274,7 +274,6 @@ int     main(int argc, char *argv[])
         // Main loop
 
         int done = 0;
-        uint64_t loops = 0;
         int mouse_button = 0;
         uint64_t last_vsync = 0;
         uint64_t last_1hz = 0;
@@ -283,7 +282,6 @@ int     main(int argc, char *argv[])
                 SDL_Event event;
                 int mousex = 0;
                 int mousey = 0;
-                loops++;
 
                 if (SDL_PollEvent(&event)) {
                         switch (event.type) {

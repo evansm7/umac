@@ -30,24 +30,24 @@
 #include "machw.h"
 
 int     umac_init(void *_ram_base, void *_rom_base, disc_descr_t discs[DISC_NUM_DRIVES]);
-int     umac_loop();
-void    umac_reset();
+int     umac_loop(void);
+void    umac_reset(void);
 void    umac_opt_disassemble(int enable);
 void    umac_mouse(int deltax, int deltay, int button);
 void    umac_kbd_event(uint8_t scancode, int down);
 
-static inline void      umac_vsync_event()
+static inline void      umac_vsync_event(void)
 {
         via_caX_event(2);
 }
 
-static inline void      umac_1hz_event()
+static inline void      umac_1hz_event(void)
 {
         via_caX_event(1);
 }
 
 /* Return the offset into RAM of the current display buffer */
-static inline unsigned int      umac_get_fb_offset()
+static inline unsigned int      umac_get_fb_offset(void)
 {
         /* FIXME: Implement VIA RA6/vid.pg2 */
         return RAM_SIZE - 0x5900;

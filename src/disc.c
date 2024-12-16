@@ -24,7 +24,7 @@
 
 #define DERR(...)       fprintf(stderr, __VA_ARGS__)
 
-extern void umac_disc_ejected();
+extern void umac_disc_ejected(void);
 
 // B2 decls:
 static int16_t SonyOpen(uint32_t pb, uint32_t dce, uint32_t status);

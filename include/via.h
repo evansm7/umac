@@ -31,8 +31,8 @@
 struct via_cb {
         void (*ra_change)(uint8_t val);
         void (*rb_change)(uint8_t val);
-        uint8_t (*ra_in)();
-        uint8_t (*rb_in)();
+        uint8_t (*ra_in)(void);
+        uint8_t (*rb_in)(void);
         void (*sr_tx)(uint8_t val);
         void (*irq_set)(int status);
 };

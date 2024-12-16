@@ -47,12 +47,12 @@
 extern uint8_t *_ram_base;
 extern uint8_t *_rom_base;
 
-static inline uint8_t *ram_get_base()
+static inline uint8_t *ram_get_base(void)
 {
         return _ram_base;
 }
 
-static inline uint8_t *rom_get_base()
+static inline uint8_t *rom_get_base(void)
 {
         return _rom_base;
 }

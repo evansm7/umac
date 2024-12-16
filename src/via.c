@@ -145,7 +145,7 @@ static void via_update_sr(uint8_t data)
  * transmit callback action -- the response then cannot race with the
  * IRQ showing the TX has completed.
  */
-static void via_sr_done()
+static void via_sr_done(void)
 {
         if (sr_tx_pending >= 0) {
                 uint8_t data = (uint8_t)sr_tx_pending;
@@ -163,7 +163,7 @@ static void via_sr_done()
 // 1 CA2: Vertical blanking interrupt
 // 0 CA1: One-second interrupt
 
-static void via_assess_irq()
+static void via_assess_irq(void)
 {
         int irq = 0;
         static uint8_t last_active = 0;
@@ -233,13 +233,13 @@ void    via_write(unsigned int address, uint8_t data)
         via_assess_irq();
 }
 
-uint8_t via_read_ifr()
+uint8_t via_read_ifr(void)
 {
         uint8_t active = irq_enable & irq_active & 0x7f;
         return irq_active | (active ? 0x80 : 0);
 }
 
-static uint8_t via_read_rega()
+static uint8_t via_read_rega(void)
 {
         uint8_t data = (via_callbacks.ra_in) ? via_callbacks.ra_in() : 0;
         uint8_t ddr = via_regs[VIA_DDRA];
@@ -247,7 +247,7 @@ static uint8_t via_read_rega()
         return (ddr & via_regs[VIA_RA]) | (~ddr & data);
 }
 
-static uint8_t via_read_regb()
+static uint8_t via_read_regb(void)
 {
         uint8_t data = (via_callbacks.rb_in) ? via_callbacks.rb_in() : 0;
         uint8_t ddr = via_regs[VIA_DDRB];

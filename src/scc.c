@@ -63,7 +63,7 @@ static uint8_t scc_dcd_pins = 0;        // 0 = A, 1 = B
 static uint8_t scc_dcd_a_changed = 0;
 static uint8_t scc_dcd_b_changed = 0;
 
-static void     scc_assess_irq();
+static void     scc_assess_irq(void);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -118,6 +118,7 @@ static void     scc_wr2(uint8_t data)
 // WR3: Receive Parameters & Control
 static void     scc_wr3(int AnB, uint8_t data)
 {
+        (void)AnB;
         // Keep an eye out for bit 0x10 (enter hunt mode), and external/status is asserted
 
         if (data & 0x10) {
@@ -223,7 +224,7 @@ static uint8_t  scc_rr15(int AnB)
 
 // Call after a state change: checks MIE, interrupt enables,
 // and (de)asserts IRQ output if necessary
-static void     scc_assess_irq()
+static void     scc_assess_irq(void)
 {
         if (scc_dcd_a_changed && (scc_ie[1] & SCC_IE_DCD)) {
                 scc_irq_pending |= SCC_IP_A_EXT;
