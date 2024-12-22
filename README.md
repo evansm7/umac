@@ -90,6 +90,8 @@ A simple SDL2-based frontend builds on Linux.
 To build on Linux, you'll need `SDL2` installed (packaged as
 `libsdl2-dev` on Ubuntu).
 
+To build in MSYS2 on Windows (mingw32, mingw64 environments have been tested), you also need [mman-win32](https://github.com/Arakula/mman-win32/) installed for the build environment of your choice.
+
 Musashi is included as a submodule, currently a custom branch with
 some optimisations for static/tiny/fast builds.  `git submodule update --init`
 
@@ -112,6 +114,13 @@ chars 'LK'.  Some emulators append a header (which can be `dd`'d off).
 
 # Build
 
+To build in MSYS2 on Windows, use
+```
+make -f Makefile.msys2
+```
+(the only difference to the normal Makefile is the addition of `-lmman` to the libraries list).
+
+On Linux or macOS, use
 ```
 make
 ```
