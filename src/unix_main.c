@@ -326,7 +326,7 @@ int     main(int argc, char *argv[])
                         last_vsync = now_usec;
 
                         /* Cheapo framerate limiting: */
-                        copy_fb(framebuffer, ram_get_base() + umac_get_fb_offset());
+                        copy_fb(framebuffer, ram_get_base(umac_get_fb_offset()));
                         SDL_UpdateTexture(texture, NULL, framebuffer,
                                           DISP_WIDTH * sizeof (Uint32));
                         /* Scales texture up to window size */

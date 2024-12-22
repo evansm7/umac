@@ -28,6 +28,12 @@
 #ifndef MACHW_H
 #define MACHW_H
 
+#ifndef DEBUG
+#define NDEBUG
+#endif
+
+#include <assert.h>
+#include <inttypes.h>
 #include "rom.h"
 
 #define ROM_ADDR        0x400000        /* Regular base (and 0, when overlay=0 */
@@ -44,9 +50,10 @@
 extern uint8_t *_ram_base;
 extern uint8_t *_rom_base;
 
-static inline uint8_t *ram_get_base(void)
+
+static inline uint8_t *ram_get_base(uint32_t addr)
 {
-        return _ram_base;
+        return _ram_base + addr;
 }
 
 static inline uint8_t *rom_get_base(void)
@@ -89,45 +96,73 @@ extern int overlay;
 #define IS_DUMMY(x)     (((ADR24(x) >= 0x800000) && (ADR24(x) < 0x9ffff8)) || ((ADR24(x) & 0xf00000) == 0x500000))
 #define IS_TESTSW(x)    (ADR24(x) >= 0xf00000)
 
+/* Our own BE read/write macros: unaligned 16b words are not required to
+ * be supported, as M68K does not allow them!  But 32b dwords can be
+ * only 16b aligned.
+ */
+__attribute__((unused)) static uint16_t _umac_read16(uint8_t *addr)
+{
+	uint16_t *r = (uint16_t *)addr;
+	assert(((uintptr_t)addr & 1) == 0);
+#if BYTE_ORDER == BIG_ENDIAN
+	return *r;
+#else
+	return __builtin_bswap16(*r);
+#endif
+}
 
-/* Unaligned/BE read/write macros from Mushashi: */
-#define READ_BYTE(BASE, ADDR)           (BASE)[ADDR]
-#define READ_WORD(BASE, ADDR)           (((BASE)[ADDR]<<8) |            \
-                                         (BASE)[(ADDR)+1])
-#define READ_LONG(BASE, ADDR)           (((BASE)[ADDR]<<24) |           \
-                                         ((BASE)[(ADDR)+1]<<16) |       \
-                                         ((BASE)[(ADDR)+2]<<8) |        \
-                                         (BASE)[(ADDR)+3])
-#define READ_WORD_AL(BASE, ADDR)         (__builtin_bswap16(*(uint16_t *)&(BASE)[(ADDR)]))
+__attribute__((unused)) static uint32_t _umac_read32(uint8_t *addr)
+{
+	uint16_t *r = (uint16_t *)addr;
+	assert(((uintptr_t)addr & 1) == 0);
+	uint16_t l,h;
+	h = r[0];
+	l = r[1];
+#if BYTE_ORDER == BIG_ENDIAN
+	return ((uint32_t)h << 16) | l;
+#else
+	return ((uint32_t)__builtin_bswap16(h) << 16) | __builtin_bswap16(l);
+#endif
+}
 
-#define WRITE_BYTE(BASE, ADDR, VAL)     do { \
-                (BASE)[ADDR] = (VAL)&0xff;   \
-        } while(0)
-#define WRITE_WORD(BASE, ADDR, VAL)     do {                            \
-                (BASE)[ADDR] = ((VAL)>>8) & 0xff;                       \
-                (BASE)[(ADDR)+1] = (VAL)&0xff;                          \
-        } while(0)
-#define WRITE_LONG(BASE, ADDR, VAL)     do {                            \
-                (BASE)[ADDR] = ((VAL)>>24) & 0xff;                      \
-                (BASE)[(ADDR)+1] = ((VAL)>>16)&0xff;                    \
-                (BASE)[(ADDR)+2] = ((VAL)>>8)&0xff;                     \
-                (BASE)[(ADDR)+3] = (VAL)&0xff;                          \
-        } while(0)
+__attribute__((unused)) static void _umac_write16(uint8_t *addr, uint16_t val)
+{
+	uint16_t *r = (uint16_t *)addr;
+	assert(((uintptr_t)addr & 1) == 0);
+#if BYE_ORDER == BIG_ENDIAN
+	*r = val;
+#else
+	*r = __builtin_bswap16(val);
+#endif
+}
+
+__attribute__((unused)) static void _umac_write32(uint8_t *addr, uint32_t val)
+{
+	uint16_t *r = (uint16_t *)addr;
+	assert(((uintptr_t)addr & 1) == 0);
+#if BYTE_ORDER == BIG_ENDIAN
+	r[0] = (val >> 16);
+	r[1] = (val & 0xffff);
+#else
+	r[0] = __builtin_bswap16(val >> 16);
+	r[1] = __builtin_bswap16(val & 0xffff);
+#endif
+}
 
 /* Specific RAM/ROM access: */
 
-#define RAM_RD8(addr)                   READ_BYTE(_ram_base, addr)
-#define RAM_RD16(addr)                  READ_WORD(_ram_base, addr)
-#define RAM_RD_ALIGNED_BE16(addr)       READ_WORD_AL(_ram_base, addr)
-#define RAM_RD32(addr)                  READ_LONG(_ram_base, addr)
+#define RAM_RD8(addr)                   (*(ram_get_base(addr)))
+#define RAM_RD16(addr)                  _umac_read16(ram_get_base(addr))
+#define RAM_RD_ALIGNED_BE16(addr)       _umac_read16(ram_get_base(addr))
+#define RAM_RD32(addr)                  _umac_read32(ram_get_base(addr))
 
-#define RAM_WR8(addr, val)              WRITE_BYTE(_ram_base, addr, val)
-#define RAM_WR16(addr, val)             WRITE_WORD(_ram_base, addr, val)
-#define RAM_WR32(addr, val)             WRITE_LONG(_ram_base, addr, val)
+#define RAM_WR8(addr, val)              do { *(ram_get_base(addr)) = (val); } while(0)
+#define RAM_WR16(addr, val)             _umac_write16(ram_get_base(addr), val)
+#define RAM_WR32(addr, val)             _umac_write32(ram_get_base(addr), val)
 
-#define ROM_RD8(addr)                   READ_BYTE(_rom_base, addr)
-#define ROM_RD16(addr)                  READ_WORD(_rom_base, addr)
-#define ROM_RD_ALIGNED_BE16(addr)       READ_WORD_AL(_rom_base, addr)
-#define ROM_RD32(addr)                  READ_LONG(_rom_base, addr)
+#define ROM_RD8(addr)                   (_rom_base[(addr)])
+#define ROM_RD16(addr)                  _umac_read16(&_rom_base[(addr)])
+#define ROM_RD_ALIGNED_BE16(addr)       _umac_read16(&_rom_base[(addr)])
+#define ROM_RD32(addr)                  _umac_read32(&_rom_base[(addr)])
 
 #endif

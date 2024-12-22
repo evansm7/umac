@@ -87,7 +87,7 @@ int     disc_pv_hook(uint8_t opcode)
 #define ReadMacInt16(addr)              RAM_RD16(addr)
 #define ReadMacInt8(addr)               RAM_RD8(addr)
 
-#define Mac2HostAddr(addr)              (ram_get_base() + ADR24(addr))
+#define Mac2HostAddr(addr)              (ram_get_base(ADR24(addr)))
 
 // These access host pointers, in BE/unaligned:
 #define WriteBEInt32(addr, val)         WRITE_LONG(((uint8_t *)(addr)), 0, val)
@@ -501,7 +501,7 @@ int16_t SonyStatus(uint32_t pb, uint32_t dce)
 			break;
 
 		case 8:			// Get drive status
-                        memcpy(pb + csParam + ram_get_base(), ram_get_base() + info->status, 22);
+                        memcpy(ram_get_base(pb + csParam), ram_get_base(info->status), 22);
 			break;
 
 		case 10:		// Get disk type and MFM info
