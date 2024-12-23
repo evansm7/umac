@@ -29,7 +29,14 @@
 #include "via.h"
 #include "machw.h"
 
+/* Simple init function, with one bank of RAM */
+#if RAM_SIZE_HI == 0
 int     umac_init(void *_ram_base, void *_rom_base, disc_descr_t discs[DISC_NUM_DRIVES]);
+#else
+/* More elaborate init providing lo/hi banks of RAM */
+int     umac_init_ext(void *_ram_lo_base, void *ram_hi_base, void *_rom_base,
+                      disc_descr_t discs[DISC_NUM_DRIVES]);
+#endif
 int     umac_loop(void);
 void    umac_reset(void);
 void    umac_opt_disassemble(int enable);

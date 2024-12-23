@@ -38,7 +38,15 @@
 
 #define ROM_ADDR        0x400000        /* Regular base (and 0, when overlay=0 */
 #define RAM_SIZE        (1024*UMAC_MEMSIZE)
-#define RAM_HIGH_ADDR   0x600000
+/* The RAM can be (host-side) split into hi/low segments, which is
+ * useful when running in an MCU (e.g. split between internal/external
+ * memory and store framebuffer (in hi) internally).
+ */
+#ifndef RAM_SIZE_HI
+#define RAM_SIZE_HI     0
+#endif
+#define RAM_SIZE_LO     (RAM_SIZE - RAM_SIZE_HI)
+#define RAM_HIGH_ADDR   0x600000        /* Initial alias of all RAM in Mac mem map */
 
 #define PV_SONY_ADDR    0xc00069        /* Magic address for replacement driver PV ops */
 
@@ -47,13 +55,20 @@
 //
 // This isn't a wonderful place, but RAM access is needed in various files.
 
-extern uint8_t *_ram_base;
+extern uint8_t *_ram_lo_base;
 extern uint8_t *_rom_base;
-
+#if RAM_SIZE_HI > 0
+extern uint8_t *_ram_hi_base;
+#endif
 
 static inline uint8_t *ram_get_base(uint32_t addr)
 {
-        return _ram_base + addr;
+#if RAM_SIZE_HI > 0
+	if (addr >= RAM_SIZE_LO)
+                return _ram_hi_base + (addr - RAM_SIZE_LO);
+        else
+#endif
+                return _ram_lo_base + addr;
 }
 
 static inline uint8_t *rom_get_base(void)

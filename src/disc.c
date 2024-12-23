@@ -89,11 +89,6 @@ int     disc_pv_hook(uint8_t opcode)
 
 #define Mac2HostAddr(addr)              (ram_get_base(ADR24(addr)))
 
-// These access host pointers, in BE/unaligned:
-#define WriteBEInt32(addr, val)         WRITE_LONG(((uint8_t *)(addr)), 0, val)
-#define WriteBEInt16(addr, val)         WRITE_WORD(((uint8_t *)(addr)), 0, val)
-#define WriteBEInt8(addr, val)          WRITE_BYTE(((uint8_t *)(addr)), 0, val)
-
 /*
  *  sony.cpp - Replacement .Sony driver (floppy drives)
  *
@@ -286,7 +281,8 @@ int16_t SonyPrime(uint32_t pb, uint32_t dce)
 	WriteMacInt8(info->status + dsDiskInPlace, 2);	// Disk accessed
 
 	// Get parameters
-	void *buffer = Mac2HostAddr(ReadMacInt32(pb + ioBuffer)); // FIXME
+        uint32_t mac_buffer_addr = ReadMacInt32(pb + ioBuffer);
+	void *buffer = Mac2HostAddr(mac_buffer_addr); // FIXME
 	size_t length = ReadMacInt32(pb + ioReqCount);
 	uint32_t position = ReadMacInt32(dce + dCtlPosition);
 	if ((length & 0x1ff) || (position & 0x1ff)) {
@@ -297,6 +293,13 @@ int16_t SonyPrime(uint32_t pb, uint32_t dce)
                 DDBG("- Off end: length 0x%lx, pos 0x%x\n", length, position);
 		return set_dsk_err(paramErr);
         }
+
+	if (mac_buffer_addr < RAM_SIZE_LO &&
+	    (mac_buffer_addr + length) >= RAM_SIZE_LO) {
+		// FIXME: Do something better, i.e. 2 reads in portions!
+		DERR("!!!! Disc READ straddles int/ext RAM (0x%06x+0x%lx)\n",
+		     mac_buffer_addr, length);
+	}
 
 	size_t actual = 0;
 	if ((ReadMacInt16(pb + ioTrap) & 0xff) == aRdCmd) {

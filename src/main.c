@@ -67,7 +67,9 @@
 static unsigned int g_int_controller_pending = 0;      /* list of pending interrupts */
 static unsigned int g_int_controller_highest_int = 0;  /* Highest pending interrupt */
 
-uint8_t *_ram_base;
+uint8_t *_ram_lo_base;
+uint8_t *_ram_hi_base;	/* Used when RAM_SIZE_HI > 0 */
+uint8_t *_ram_int_base;
 uint8_t *_rom_base;
 
 int overlay = 1;
@@ -562,9 +564,11 @@ void    cpu_instr_callback(int pc)
 	fflush(stdout);
 }
 
-int     umac_init(void *ram_base, void *rom_base, disc_descr_t discs[DISC_NUM_DRIVES])
+static int      _umac_init(void *ram_lo_base, void *ram_hi_base, void *rom_base,
+                           disc_descr_t discs[DISC_NUM_DRIVES])
 {
-        _ram_base = ram_base;
+        _ram_lo_base = ram_lo_base;
+        _ram_hi_base = ram_hi_base;
         _rom_base = rom_base;
 
 	m68k_init();
@@ -586,6 +590,19 @@ int     umac_init(void *ram_base, void *rom_base, disc_descr_t discs[DISC_NUM_DR
 
         return 0;
 }
+
+#if RAM_SIZE_HI == 0
+int     umac_init(void *ram_base, void *rom_base, disc_descr_t discs[DISC_NUM_DRIVES])
+{
+	return _umac_init(ram_base, 0, rom_base, discs);
+}
+#else
+int     umac_init_ext(void *ram_lo_base, void *ram_hi_base, void *rom_base,
+		      disc_descr_t discs[DISC_NUM_DRIVES])
+{
+	return _umac_init(ram_lo_base, ram_hi_base, rom_base, discs);
+}
+#endif
 
 void    umac_opt_disassemble(int enable)
 {

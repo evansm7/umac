@@ -90,6 +90,7 @@ static void     copy_fb(uint32_t *fb_out, uint8_t *fb_in)
 int     main(int argc, char *argv[])
 {
         void *ram_base;
+        void *ram_int_base;
         void *rom_base;
         void *disc_base;
         char *rom_filename = "rom.bin";
@@ -185,12 +186,22 @@ int     main(int argc, char *argv[])
                 perror("RAM ftruncate");
                 return 1;
         }
-        ram_base = mmap(0, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
+        ram_base = mmap(0, RAM_SIZE_LO, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
         if (ram_base == MAP_FAILED) {
-                perror("RAM mmap");
+                perror("RAM1 mmap");
                 return 1;
         }
         printf("RAM mapped at %p\n", (void *)ram_base);
+#if RAM_SIZE_HI > 0
+        ram_int_base = mmap(0, RAM_SIZE_HI, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        if (ram_int_base == MAP_FAILED) {
+                perror("RAM2 mmap");
+                return 1;
+        }
+        printf("RAM2 mapped at %p\n", (void *)ram_int_base);
+#else
+        (void)ram_int_base;
+#endif
 
         disc_descr_t discs[DISC_NUM_DRIVES] = {0};
 
@@ -267,7 +278,11 @@ int     main(int argc, char *argv[])
         ////////////////////////////////////////////////////////////////////////
         // Emulator init
 
+#if RAM_SIZE_HI == 0
         umac_init(ram_base, rom_base, discs);
+#else
+        umac_init_ext(ram_base, ram_int_base, rom_base, discs);
+#endif
         umac_opt_disassemble(opt_disassemble);
 
         ////////////////////////////////////////////////////////////////////////
