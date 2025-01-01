@@ -44,6 +44,11 @@
 
 #include "keymap_sdl.h"
 
+#ifndef O_BINARY
+/* O_BINARY not defined? Not necessary, either. */
+#define O_BINARY 0
+#endif
+
 static void     print_help(char *n)
 {
         printf("Syntax: %s <options>\n"
@@ -137,7 +142,7 @@ int     main(int argc, char *argv[])
         // Load memories/discs
 
         printf("Opening ROM '%s'\n", rom_filename);
-        ofd = open(rom_filename, O_RDONLY);
+        ofd = open(rom_filename, O_RDONLY | O_BINARY);
         if (ofd < 0) {
                 perror("ROM");
                 return 1;
@@ -156,7 +161,7 @@ int     main(int argc, char *argv[])
                 return 1;
         }
         if (rom_dump_filename) {
-                int rfd = open(rom_dump_filename, O_CREAT | O_TRUNC | O_RDWR, 0655);
+                int rfd = open(rom_dump_filename, O_CREAT | O_TRUNC | O_RDWR | O_BINARY, 0655);
                 if (rfd < 0) {
                         perror("ROM dump");
                         return 1;
@@ -176,7 +181,7 @@ int     main(int argc, char *argv[])
         }
 
         /* Set up RAM, shared file map: */
-        ofd = open(ram_filename, O_CREAT | O_TRUNC | O_RDWR, 0644);
+        ofd = open(ram_filename, O_CREAT | O_TRUNC | O_RDWR | O_BINARY, 0644);
         if (ofd < 0) {
                 perror("RAM");
                 return 1;
@@ -197,7 +202,7 @@ int     main(int argc, char *argv[])
         if (disc_filename) {
                 printf("Opening disc '%s'\n", disc_filename);
                 // FIXME: >1 disc
-                ofd = open(disc_filename, opt_write ? O_RDWR : O_RDONLY);
+                ofd = open(disc_filename, (opt_write ? O_RDWR : O_RDONLY) | O_BINARY);
                 if (ofd < 0) {
                         perror("Disc");
                         return 1;
@@ -219,7 +224,7 @@ int     main(int argc, char *argv[])
                         printf("Can't mmap disc!\n");
                         return 1;
                 }
-                printf("Disc mapped at %p, size %ld\n", (void *)disc_base, disc_size);
+                printf("Disc mapped at %p, size %ld\n", (void *)disc_base, (long)disc_size);
 
                 discs[0].base = disc_base;
                 discs[0].read_only = 0;         /* See above */
