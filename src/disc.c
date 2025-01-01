@@ -17,7 +17,7 @@
 #include "machw.h"
 
 #ifdef DEBUG
-#define DDBG(...)       printf(__VA_ARGS__)
+#define DDBG(...)       fprintf(stderr, __VA_ARGS__)
 #else
 #define DDBG(...)       do {} while(0)
 #endif
@@ -25,6 +25,8 @@
 #define DERR(...)       fprintf(stderr, __VA_ARGS__)
 
 extern void umac_disc_ejected(void);
+
+#define DISC_SECTOR_SIZE	512
 
 // B2 decls:
 static int16_t SonyOpen(uint32_t pb, uint32_t dce, uint32_t status);
@@ -261,6 +263,265 @@ int16_t SonyOpen(uint32_t pb, uint32_t dce, uint32_t status)
         return noErr;
 }
 
+static int16_t do_read(sony_drinfo_t *info, void *buffer,
+		       size_t length, uint32_t position)
+{
+	if (info->data) {
+		DDBG(" (Read buffer: %p)\n", (void *)&info->data[position]);
+		memcpy(buffer, &info->data[position], length);
+	} else {
+		if (info->op_read) {
+			DDBG(" (read op into buffer)\n");
+			int r = info->op_read(info->op_ctx, buffer, position, length);
+			if (r < 0)
+				return set_dsk_err(paramErr);
+		} else {
+			DERR("No disc read strategy!\n");
+			return set_dsk_err(offLinErr);
+		}
+	}
+	return 0;
+}
+
+static int16_t do_write(sony_drinfo_t *info, void *buffer,
+			size_t length, uint32_t position)
+{
+	if (info->data) {
+		DDBG(" (Write buffer: %p)\n", (void *)&info->data[position]);
+		memcpy(&info->data[position], buffer, length);
+	} else {
+		if (info->op_write) {
+			DDBG(" (write op into buffer)\n");
+			int r = info->op_write(info->op_ctx, buffer, position, length);
+			if (r < 0)
+				return set_dsk_err(paramErr);
+		} else {
+			DERR("No disc write strategy!\n");
+			return set_dsk_err(offLinErr);
+		}
+	}
+	return 0;
+}
+
+#if RAM_SIZE_HI > 0
+/* Special-case support for discontiguous host memory and a read/write
+ * that straddles the boundary of low/high memory.
+ *
+ * FIXME: Refactor this; while these routines assume the access
+ * straddles the boundary, these routines could be made generic
+ * and deal with normal accesses too.
+ */
+static uint8_t sectorbuff[DISC_SECTOR_SIZE];
+
+static int16_t SonyPrime_read_special(sony_drinfo_t *info, unsigned long mac_buffer_addr,
+				      size_t length, uint32_t position)
+{
+	DDBG("DISC: READ 0x%lx from +0x%x to 0x%06lx straddles RAM split (0x%x:0x%x)\n",
+	     length, position, mac_buffer_addr, RAM_SIZE_LO, RAM_SIZE_HI);
+	/* This supports discontiguous host memory
+	 * (i.e. RAM_SIZE_HI/RAM_SIZE_LO chunks) and a transfer that
+	 * _might_ straddle the boundary between them.
+	 *
+	 * There are three spans:
+	 *  1- Sectors entirely beneath the RAM_SIZE_LO split point
+	 *  2- One sector straddling the split point
+	 *  3- Sectors entirely above the split point
+	 *
+	 * Remember the destination buffer isn't necessarily aligned
+	 * in any way, either.
+	 *
+	 * Each of the 3 categories might be zero, e.g.:
+	 *  - First sector straddles the boundary and subsequent sectors
+	 *    are entirely above it (2,3)
+	 *  - Only one sector, straddling the boundary (2)
+	 *  - Sectors run up to the boundary, exactly aligned, and no
+	 *    sector straddles the boundary; some continue after (1,3).
+	 *
+	 * When discontiguous memory is not used, all transfers fall
+	 * into case 1.
+	 */
+	unsigned long total_sectors = length / DISC_SECTOR_SIZE; /* At least 1! */
+	unsigned long bytes_below_split = RAM_SIZE_LO - mac_buffer_addr;
+
+	unsigned int secs_before = bytes_below_split / DISC_SECTOR_SIZE; /* Rounds down */
+	unsigned int sector_bytes_below_split = (bytes_below_split % DISC_SECTOR_SIZE);
+	unsigned int sectors_across_split = sector_bytes_below_split ? 1 : 0;
+	unsigned int secs_after = total_sectors - secs_before - sectors_across_split;
+
+	int r = 0;
+
+	if (secs_before) { /* Case 1 */
+		void *buffer = Mac2HostAddr(mac_buffer_addr);
+		DDBG("DISC: READ 0x%x to 0x%06lx before split, at +0x%x\n",
+		     secs_before * DISC_SECTOR_SIZE, mac_buffer_addr, position);
+		r = do_read(info, buffer, secs_before * DISC_SECTOR_SIZE, position);
+		if (r)
+			return r;
+	}
+
+	if (sectors_across_split) { /* Case 2 */
+		uint32_t boffs = position + (secs_before * DISC_SECTOR_SIZE);
+		DDBG("DISC: READ straddling sector +0x%x (0x%x bytes)\n", boffs,
+		     sector_bytes_below_split);
+		r = do_read(info, sectorbuff, DISC_SECTOR_SIZE, boffs);
+		if (r)
+			return r;
+
+		/* Now copy to the two buffer halves: */
+		unsigned long dest = mac_buffer_addr + (secs_before * DISC_SECTOR_SIZE);
+		DDBG("DISC:  Copying 0x%x to 0x%06lx\n", sector_bytes_below_split, dest);
+		memcpy(Mac2HostAddr(dest),
+		       sectorbuff,
+		       sector_bytes_below_split);
+		DDBG("DISC:  Copying 0x%x to 0x%06lx\n",
+		     DISC_SECTOR_SIZE - sector_bytes_below_split,
+		     dest + sector_bytes_below_split);
+		memcpy(Mac2HostAddr(dest + sector_bytes_below_split),
+		       sectorbuff + sector_bytes_below_split,
+		       DISC_SECTOR_SIZE - sector_bytes_below_split);
+	}
+
+	if (secs_after) { /* Case 3 */
+		unsigned long dest = mac_buffer_addr + (secs_before * DISC_SECTOR_SIZE);
+		uint32_t boffs = position + (secs_before * DISC_SECTOR_SIZE);
+		if (sectors_across_split) {
+			dest += DISC_SECTOR_SIZE;
+			boffs += DISC_SECTOR_SIZE;
+		}
+		void *buffer = Mac2HostAddr(dest);
+
+		DDBG("DISC: READ 0x%x to 0x%06lx after split, at +0x%x\n",
+		     secs_after * DISC_SECTOR_SIZE, dest, boffs);
+		r = do_read(info, buffer, secs_after * DISC_SECTOR_SIZE, boffs);
+		if (r)
+			return r;
+	}
+
+	// Clear TagBuf
+	WriteMacInt32(0x2fc, 0);
+	WriteMacInt32(0x300, 0);
+	WriteMacInt32(0x304, 0);
+
+	return 0;
+}
+
+static int16_t SonyPrime_write_special(sony_drinfo_t *info, unsigned long mac_buffer_addr,
+				       size_t length, uint32_t position)
+{
+	DDBG("DISC: WRITE 0x%lx to +0x%x from 0x%06lx straddles RAM split (0x%x:0x%x)\n",
+	     length, position, mac_buffer_addr, RAM_SIZE_LO, RAM_SIZE_HI);
+	/* See comments above! This function is the write equivalent of SonyPrime_read_special */
+
+	unsigned long total_sectors = length / DISC_SECTOR_SIZE; /* At least 1! */
+	unsigned long bytes_below_split = RAM_SIZE_LO - mac_buffer_addr;
+
+	unsigned int secs_before = bytes_below_split / DISC_SECTOR_SIZE; /* Rounds down */
+	unsigned int sector_bytes_below_split = (bytes_below_split % DISC_SECTOR_SIZE);
+	unsigned int sectors_across_split = sector_bytes_below_split ? 1 : 0;
+	unsigned int secs_after = total_sectors - secs_before - sectors_across_split;
+
+	int r = 0;
+
+	if (secs_before) { /* Case 1 */
+		void *buffer = Mac2HostAddr(mac_buffer_addr);
+		DDBG("DISC: WRITE 0x%x from 0x%06lx before split, at +0x%x\n",
+		     secs_before * DISC_SECTOR_SIZE, mac_buffer_addr, position);
+		r = do_write(info, buffer, secs_before * DISC_SECTOR_SIZE, position);
+		if (r)
+			return r;
+	}
+
+	if (sectors_across_split) { /* Case 2 */
+		uint32_t boffs = position + (secs_before * DISC_SECTOR_SIZE);
+		DDBG("DISC: WRITE straddling sector +0x%x (0x%x bytes)\n", boffs,
+		     sector_bytes_below_split);
+		/* Assemble output buffer */
+		/* Now copy to the two buffer halves: */
+		unsigned long dest = mac_buffer_addr + (secs_before * DISC_SECTOR_SIZE);
+		DDBG("DISC:  Copying 0x%x from 0x%06lx\n", sector_bytes_below_split, dest);
+		memcpy(sectorbuff,
+		       Mac2HostAddr(dest),
+		       sector_bytes_below_split);
+		DDBG("DISC:  Copying 0x%x from 0x%06lx\n",
+		     DISC_SECTOR_SIZE - sector_bytes_below_split,
+		     dest + sector_bytes_below_split);
+		memcpy(sectorbuff + sector_bytes_below_split,
+		       Mac2HostAddr(dest + sector_bytes_below_split),
+		       DISC_SECTOR_SIZE - sector_bytes_below_split);
+
+		DDBG("DISC: WRITE sector +0x%x\n", boffs);
+		r = do_write(info, sectorbuff, DISC_SECTOR_SIZE, boffs);
+		if (r)
+			return r;
+
+	}
+
+	if (secs_after) { /* Case 3 */
+		unsigned long dest = mac_buffer_addr + (secs_before * DISC_SECTOR_SIZE);
+		uint32_t boffs = position + (secs_before * DISC_SECTOR_SIZE);
+		if (sectors_across_split) {
+			dest += DISC_SECTOR_SIZE;
+			boffs += DISC_SECTOR_SIZE;
+		}
+		void *buffer = Mac2HostAddr(dest);
+
+		DDBG("DISC: WRITE 0x%x from 0x%06lx after split, at +0x%x\n",
+		     secs_after * DISC_SECTOR_SIZE, dest, boffs);
+		r = do_write(info, buffer, secs_after * DISC_SECTOR_SIZE, boffs);
+		if (r)
+			return r;
+	}
+	return 0;
+}
+
+#endif
+
+static int16_t SonyPrime_read(sony_drinfo_t *info, unsigned long mac_buffer_addr,
+                              size_t length, uint32_t position)
+{
+#if RAM_SIZE_HI > 0
+	/* Deal with the special case of an access straddling the Mac low/high memory
+	 * boundary by splitting the access into sectors -- elsewhere:
+	 */
+	if (mac_buffer_addr < RAM_SIZE_LO &&
+	    (mac_buffer_addr + length) >= RAM_SIZE_LO) {
+		return SonyPrime_read_special(info, mac_buffer_addr, length, position);
+	}
+#endif
+
+	DDBG("DISC: READ 0x%lx from +0x%x to 0x%06lx\n", length, position, mac_buffer_addr);
+	void *buffer = Mac2HostAddr(mac_buffer_addr);
+
+	int r = do_read(info, buffer, length, position);
+	if (r)
+		return r;
+
+	// Clear TagBuf
+	WriteMacInt32(0x2fc, 0);
+	WriteMacInt32(0x300, 0);
+	WriteMacInt32(0x304, 0);
+	return 0;
+}
+
+static int16_t SonyPrime_write(sony_drinfo_t *info, unsigned long mac_buffer_addr,
+			       size_t length, uint32_t position)
+{
+#if RAM_SIZE_HI > 0
+	/* As above, deal with split. */
+	if (mac_buffer_addr < RAM_SIZE_LO &&
+	    (mac_buffer_addr + length) >= RAM_SIZE_LO) {
+		return SonyPrime_write_special(info, mac_buffer_addr, length, position);
+	}
+#endif
+
+	DDBG("DISC: WRITE 0x%lx from 0x%06lx to +0x%x\n", length, mac_buffer_addr, position);
+	void *buffer = Mac2HostAddr(mac_buffer_addr);
+
+	if (info->read_only)
+		return set_dsk_err(wPrErr);
+
+        return do_write(info, buffer, length, position);
+}
 
 /*
  *  Driver Prime() routine
@@ -282,7 +543,6 @@ int16_t SonyPrime(uint32_t pb, uint32_t dce)
 
 	// Get parameters
         uint32_t mac_buffer_addr = ReadMacInt32(pb + ioBuffer);
-	void *buffer = Mac2HostAddr(mac_buffer_addr); // FIXME
 	size_t length = ReadMacInt32(pb + ioReqCount);
 	uint32_t position = ReadMacInt32(dce + dCtlPosition);
 	if ((length & 0x1ff) || (position & 0x1ff)) {
@@ -294,58 +554,15 @@ int16_t SonyPrime(uint32_t pb, uint32_t dce)
 		return set_dsk_err(paramErr);
         }
 
-	if (mac_buffer_addr < RAM_SIZE_LO &&
-	    (mac_buffer_addr + length) >= RAM_SIZE_LO) {
-		// FIXME: Do something better, i.e. 2 reads in portions!
-		DERR("!!!! Disc READ straddles int/ext RAM (0x%06x+0x%lx)\n",
-		     mac_buffer_addr, length);
-	}
-
 	size_t actual = 0;
+	int r;
 	if ((ReadMacInt16(pb + ioTrap) & 0xff) == aRdCmd) {
-                DDBG("DISC: READ %ld from +0x%x\n", length, position);
-                if (info->data) {
-                        DDBG(" (Read buffer: %p)\n", (void *)&info->data[position]);
-                        memcpy(buffer, &info->data[position], length);
-                } else {
-                        if (info->op_read) {
-                                DDBG(" (read op into buffer)\n");
-                                int r = info->op_read(info->op_ctx, buffer, position, length);
-                                if (r < 0)
-                                        return set_dsk_err(paramErr);
-                        } else {
-                                DERR("No disc read strategy!\n");
-                                return set_dsk_err(offLinErr);
-                        }
-                }
-
-		// Clear TagBuf
-		WriteMacInt32(0x2fc, 0);
-		WriteMacInt32(0x300, 0);
-		WriteMacInt32(0x304, 0);
+		r = SonyPrime_read(info, mac_buffer_addr, length, position);
 	} else {
-                DDBG("DISC: WRITE %ld to +0x%x\n", length, position);
-
-		// Write
-		if (info->read_only)
-			return set_dsk_err(wPrErr);
-
-                DDBG("DISC: WRITE %ld to +0x%x\n", length, position);
-                if (info->data) {
-                        DDBG(" (Write buffer: %p)\n", (void *)&info->data[position]);
-                        memcpy(&info->data[position], buffer, length);
-                } else {
-                        if (info->op_write) {
-                                DDBG(" (write op into buffer)\n");
-                                int r = info->op_write(info->op_ctx, buffer, position, length);
-                                if (r < 0)
-                                        return set_dsk_err(paramErr);
-                        } else {
-                                DERR("No disc write strategy!\n");
-                                return set_dsk_err(offLinErr);
-                        }
-                }
+		r = SonyPrime_write(info, mac_buffer_addr, length, position);
         }
+	if (r)	// Error
+		return r;
 
 	// Update ParamBlock and DCE
 	WriteMacInt32(pb + ioActCount, actual);
